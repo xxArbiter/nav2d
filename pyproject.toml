@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nav2d"
+version = "0.0.1"
+authors = [
+  { name="Xiaoyu Wang", email="cnxiaoyu.wang@mail.utoronto.ca" },
+  { name="Jihwan Jeong", email="jiihwan.jeong@gmail.com" },
+]
+license = {file = "LICENSE"}
+keywords  = ["gym", "navigation", "rl"]
+description = "2D Navigation Gym Environment"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "numpy",
+  "pygame",
+  "gym",
+]
+[project.urls]
+"Homepage" = "https://github.com/xxArbiter/nav2d"
+"Bug Tracker" = "https://github.com/xxArbiter/nav2d/issues"

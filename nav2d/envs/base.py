@@ -5,8 +5,8 @@ import pygame
 from pygame.locals import Rect
 from typing import Dict, List
 
-from rlkit.envs.assets.nav_2d import *
-from rlkit.envs.assets.nav_2d import DynamicRegion, List, RewardRegion
+from nav2d.assets.elements import Point, Vector, Line, DirectEdge, RelativePos, Polygon, Box
+from nav2d.assets.regions import Region, DynamicRegion, SimpleDynamicRegion, PunchRegion, NoEntryRegion, SlipperyRegion, BlackHoleRegion, RewardRegion, SimpleRewardRegion
 
 from . import EPS_GOAL
 
