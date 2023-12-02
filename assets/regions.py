@@ -64,7 +64,7 @@ class Region(Element):
         if isinstance(propositions, Vector):
             propositions = [propositions]
 
-        if self._zone.point_relative_pos(p0) == Polygon.IN:
+        if self._zone.point_relative_pos(p0) == RelativePos.IN:
             return p0, -1
 
         p = p0
@@ -99,7 +99,7 @@ class DynamicRegion(Region):
 
     @property
     def should_apply(self):
-        return [Polygon.IN]
+        return [RelativePos.IN]
 
 
 class SimpleDynamicRegion(DynamicRegion):
@@ -124,7 +124,7 @@ class PunchRegion(SimpleDynamicRegion):
 
     def _apply_dynamic(self, p0: Point, proposition: Vector):
         _, rel_poss = self.check_segment_cross(p0, proposition)
-        if Polygon.IN in rel_poss:
+        if RelativePos.IN in rel_poss:
             return proposition + self._force
         return proposition
 
@@ -270,7 +270,7 @@ class RewardRegion(Region):
 
     @property
     def should_apply(self):
-        return [Polygon.IN, Polygon.ON]
+        return [RelativePos.IN, RelativePos.ON]
 
     def __repr__(self) -> str:
         return f"Reward zone with reward rate '{self._reward}'. " + str(self._zone)
