@@ -1,8 +1,8 @@
 import numpy as np
 
-from assets.elements import Point, Polygon, Box
-from assets.regions import NoEntryRegion, BlackHoleRegion, SimpleRewardRegion
-from .base import Navigation
+from nav2d.assets.elements import Point, Polygon, Box
+from nav2d.assets.regions import NoEntryRegion, BlackHoleRegion, SimpleRewardRegion
+from nav2d.envs.base import Navigation
 
 
 class HomoNav(Navigation):
