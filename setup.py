@@ -16,5 +16,5 @@ setup(
     author='Xiaoyu Wang',
     author_email='cnxiaoyu.wang@mail.utoronto.ca',
     url='https://github.com/xxArbiter/nav2d',
-    download_url="https://github.com/xxArbiter/nav2d/archive/refs/tags/0.0.1.tar.gz"
+    download_url="https://github.com/xxArbiter/nav2d/archive/refs/tags/0.0.2.tar.gz"
 )

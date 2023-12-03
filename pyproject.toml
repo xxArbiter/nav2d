@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nav2d"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="Xiaoyu Wang", email="cnxiaoyu.wang@mail.utoronto.ca" },
   { name="Jihwan Jeong", email="jiihwan.jeong@gmail.com" },
