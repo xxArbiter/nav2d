@@ -294,9 +294,10 @@ class RelativePos(Enum):
     
     
 class Shape(Element):
-    def __init__(self) -> None:
+    def __init__(self, seed: int = 0) -> None:
         super().__init__()
         self._envelope = self._get_envelope()
+        self._np_random = np.random.default_rng(seed=seed)
         
     @abstractmethod
     def _get_envelope(self) -> Tuple[Point, Point]: ...
@@ -304,7 +305,18 @@ class Shape(Element):
     @property
     def envelope(self) -> Tuple[Point, Point]:
         return self._envelope
-    
+
+    @property
+    def np_random(self) -> np.random.Generator:
+        if self._np_random is None:
+            print('Reinitialize np_random')
+            self._np_random = np.random.default_rng()
+        return self._np_random
+
+    @np_random.setter
+    def np_random(self, np_random: np.random.Generator) -> None:
+        self._np_random = np_random
+
     @abstractmethod
     def __add__(self, vector: Vector) -> "Shape": ...
     
@@ -327,10 +339,10 @@ class Shape(Element):
     
     
 class Circle(Shape):
-    def __init__(self, center: Point, radius: float) -> None:
+    def __init__(self, center: Point, radius: float, seed: int = 0) -> None:
         self._c = center
         self._r = radius
-        super().__init__()
+        super().__init__(seed=seed)
         
     def _get_envelope(self) -> Tuple[Point]:
         return (
@@ -364,8 +376,8 @@ class Circle(Shape):
         return RelativePos.OUT
     
     def sample_point(self) -> Point:
-        r = self._r * (np.random.uniform() ** 2)
-        theta = np.random.uniform(0, 2 * np.pi)
+        r = self._r * (self.np_random.uniform() ** 2)
+        theta = self.np_random.uniform(0, 2 * np.pi)
         return Point(self._c.x + r * np.cos(theta), self._c.y + r * np.sin(theta))
     
     def __repr__(self) -> str:
@@ -373,7 +385,7 @@ class Circle(Shape):
 
 
 class Polygon(Shape):
-    def __init__(self, vertices: List[Point]) -> None:
+    def __init__(self, vertices: List[Point], seed: int = 0) -> None:
         assert len(vertices) >= 3
         self._vertices = vertices
         self._edges = [
@@ -382,7 +394,7 @@ class Polygon(Shape):
         for e, e_n in zip(self._edges, self._edges[1:] + [self._edges[0]]):
             if (e.b - e.a).cross(e_n.b - e_n.a) == 0:
                 raise ValueError(f"Edge {e} and {e_n} are parallel!")
-        super().__init__()
+        super().__init__(seed=seed)
         
     def _get_envelope(self) -> Tuple[Point]:
         return (
@@ -447,8 +459,8 @@ class Polygon(Shape):
         min_x, min_y = self._envelope[0].pos
         max_x, max_y = self._envelope[1].pos
         while True:
-            x = np.random.uniform(min_x, max_x)
-            y = np.random.uniform(min_y, max_y)
+            x = self.np_random.uniform(min_x, max_x)
+            y = self.np_random.uniform(min_y, max_y)
             point = Point(x, y)
             if self.point_relative_pos(point) == RelativePos.IN:
                 return point
@@ -471,10 +483,15 @@ class Box(Polygon):
     y   c ----------- d
     """
 
-    def __init__(self, vertex: Point, width: float, height: float) -> None:
+    def __init__(
+        self, vertex: Point, width: float, height: float, seed: int = 0,
+    ) -> None:
         ab = Vector(width, 0)
         ac = Vector(0, height)
-        super().__init__([vertex, vertex + ab, vertex + ab + ac, vertex + ac])
+        super().__init__(
+            [vertex, vertex + ab, vertex + ab + ac, vertex + ac],
+            seed=seed,
+        )
 
     def point_relative_pos(self, point: Point) -> RelativePos:
         if all((
@@ -490,5 +507,5 @@ class Box(Polygon):
     def sample_point(self) -> Point:
         min_x, min_y = self._envelope[0].pos
         max_x, max_y = self._envelope[1].pos
-        return Point(np.random.uniform(min_x, max_x), np.random.uniform(min_y, max_y))
+        return Point(self.np_random.uniform(min_x, max_x), self.np_random.uniform(min_y, max_y))
 

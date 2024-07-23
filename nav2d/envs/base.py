@@ -362,6 +362,7 @@ class MultiNavigation(Navigation):
         v_max: float = .1,
         screen_scale: int = 600,
         margin: float = 0.1,
+        sparse: bool = True,
         **kwargs,
     ):
         self.init_zones = init_zones
@@ -378,9 +379,10 @@ class MultiNavigation(Navigation):
         self.action_space = spaces.Box(-v_max, v_max, shape=(2,), dtype=np.float32)
         
         # Reward setup
-        self.time_penalty = 0.
-        self.control_penalty = 0.
-        self.goal_reward = 1.
+        if sparse:
+            self.time_penalty = 0.
+            self.control_penalty = 0.
+            self.goal_reward = 1.
         
         self.pos_dim = 2
         self._draw_init = False
@@ -388,10 +390,13 @@ class MultiNavigation(Navigation):
         self._boundary_setup()
         
     def reset(self):
-        idx = np.random.randint(0, len(self.init_zones))
+        if self.np_random is None:
+            print('Seed is not set... defaulting to 0.')
+            self.seed(0)
+        idx = self.np_random.integers(0, len(self.init_zones))
         init = self.init_zones[idx].sample_point()
         self.state = np.array([init.x, init.y], dtype=np.float32)
-        idx = np.random.randint(0, self.num_goals)
+        idx = self.np_random.integers(0, self.num_goals)
         self.goal = self.goal_candidates[idx]
         
         self.last_state = None

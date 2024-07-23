@@ -135,6 +135,8 @@ class CellMapMultiNav(MultiNavigation):
         num_dynamics: int,
         v_max: float,
         map_seed: int,
+        seed: int,
+        sparse: bool = True,
     ):
         init_cells = train_init_cells + eval_init_cells
         self.cell_map = generate_map(
@@ -148,16 +150,17 @@ class CellMapMultiNav(MultiNavigation):
             seed=map_seed,
         )
         
-        self.train_init_zones = [Box(Point(*cell), 1, 1) for cell in train_init_cells]
-        self.eval_init_zones = [Box(Point(*cell), 1, 1) for cell in eval_init_cells]
+        self.train_init_zones = [Box(Point(*cell), 1, 1, seed=seed+i) for i, cell in enumerate(train_init_cells)]
+        self.eval_init_zones = [Box(Point(*cell), 1, 1, seed=seed+i) for i, cell in enumerate(eval_init_cells)]
         goals = [Circle(Point(*cell) + Vector(.5, .5), 0.5) for cell in goal_cells]
         
         super().__init__(
             init_zones=self.train_init_zones + self.eval_init_zones,
             goals=goals,
-            dynamic_zones= self.cell_map._block_regions + self.cell_map._dynamic_regions,
+            dynamic_zones=self.cell_map._block_regions + self.cell_map._dynamic_regions,
             reward_zones=[],
             v_max=v_max,
+            sparse=sparse,
         )
         
     def reset(self, eval: bool = False):
