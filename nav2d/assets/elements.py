@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Literal
+from typing import Union, List, Tuple, Literal, Any
 from enum import Enum
 import numpy as np
 
@@ -18,10 +18,33 @@ class Point(Element):
         self._x = x
         self._y = y
         self._pos = np.array([x, y])
+        
+    @property
+    def x(self) -> float:
+        return self._x
+    
+    @x.setter
+    def x(self, x: float) -> None:
+        self._x = x
+        self._pos[0] = x
+    
+    @property
+    def y(self) -> float:
+        return self._y
+    
+    @y.setter
+    def y(self, y: float) -> None:
+        self._y = y
+        self._pos[1] = y
 
     @property
     def pos(self) -> np.array:
         return self._pos
+    
+    @pos.setter
+    def pos(self, pos: np.array) -> None:
+        self._pos = pos
+        self._x, self._y = pos
 
     def __add__(self, vector: "Vector") -> "Point":
         if not isinstance(vector, Vector):
@@ -42,7 +65,7 @@ class Point(Element):
         return hash((self._x, self._y))
 
     def __repr__(self) -> str:
-        return "Point at ({x:.2f}, {y:.2f})".format(x=self._x, y=self._y)
+        return "Point({x:.2f}, {y:.2f})".format(x=self._x, y=self._y)
 
 
 class Vector(Point):
@@ -97,18 +120,30 @@ class Line(Element):
     def __init__(self, a: Point, b: Point) -> None:
         self._a = a
         self._b = b
-        self._envelop = (
-            Point(*np.minimum(a._pos, b._pos)),
-            Point(*np.maximum(a._pos, b._pos)),
+        self._envelope = (
+            Point(*np.minimum(a.pos, b.pos)),
+            Point(*np.maximum(a.pos, b.pos)),
         )
+
+    @property
+    def a(self) -> Point:
+        return self._a
+    
+    @property
+    def b(self) -> Point:
+        return self._b
+    
+    @property
+    def envelope(self) -> Tuple[Point, Point]:
+        return self._envelope
 
     def is_repel(self, other: "Line") -> bool:
         if all(
             (
-                self._envelop[0]._x <= other._envelop[1]._x,
-                self._envelop[1]._x >= other._envelop[0]._x,
-                self._envelop[0]._y <= other._envelop[1]._y,
-                self._envelop[1]._y >= other._envelop[0]._y,
+                self._envelope[0].x <= other._envelope[1].x,
+                self._envelope[1].x >= other._envelope[0].x,
+                self._envelope[0].y <= other._envelope[1].y,
+                self._envelope[1].y >= other._envelope[0].y,
             )
         ):
             return False
@@ -236,7 +271,7 @@ class Line(Element):
 
     def __repr__(self) -> str:
         return "Line ({x1:.2f}, {y1:.2f}), ({x2:.2f}, {y2:.2f})".format(
-            x1=self._a._x, y1=self._a._y, x2=self._b._x, y2=self._b._y
+            x1=self._a.x, y1=self._a.y, x2=self._b.x, y2=self._b.y
         )
 
 
@@ -256,9 +291,88 @@ class RelativePos(Enum):
     IN = -1
     ON = 0
     OUT = 1
+    
+    
+class Shape(Element):
+    def __init__(self) -> None:
+        super().__init__()
+        self._envelope = self._get_envelope()
+        
+    @abstractmethod
+    def _get_envelope(self) -> Tuple[Point, Point]: ...
+    
+    @property
+    def envelope(self) -> Tuple[Point, Point]:
+        return self._envelope
+    
+    @abstractmethod
+    def __add__(self, vector: Vector) -> "Shape": ...
+    
+    def __radd__(self, x: Any) -> None:
+        raise TypeError("Can only use __add__ to add a vector to a shape.")
+    
+    @abstractmethod
+    def move(self, vector: Vector) -> None: ...
+    
+    @abstractmethod
+    def scale(self) -> None: ...
+    
+    @abstractmethod
+    def point_relative_pos(self, point: Point) -> RelativePos: ...
+    
+    @abstractmethod
+    def sample_point(self) -> Point:
+        """ Sample a point INSIDE the shape. """
+        ...
+    
+    
+class Circle(Shape):
+    def __init__(self, center: Point, radius: float) -> None:
+        self._c = center
+        self._r = radius
+        super().__init__()
+        
+    def _get_envelope(self) -> Tuple[Point]:
+        return (
+            Point(self._c.x - self._r, self._c.y - self._r),
+            Point(self._c.x + self._r, self._c.y + self._r),
+        )
+
+    @property
+    def center(self) -> Point:
+        return self._c
+    
+    @property
+    def radius(self) -> float:
+        return self._r
+        
+    def __add__(self, vector: Vector) -> "Circle":
+        return Circle(self._c + vector, self._r)
+    
+    def move(self, vector: Vector) -> None:
+        self._c += vector
+    
+    def scale(self, ratio: float) -> None:
+        self._r *= ratio
+    
+    def point_relative_pos(self, point: Point) -> RelativePos:
+        dist = (point - self._c).length
+        if dist < self._r:
+            return RelativePos.IN
+        if dist == self._r:
+            return RelativePos.ON
+        return RelativePos.OUT
+    
+    def sample_point(self) -> Point:
+        r = self._r * (np.random.uniform() ** 2)
+        theta = np.random.uniform(0, 2 * np.pi)
+        return Point(self._c.x + r * np.cos(theta), self._c.y + r * np.sin(theta))
+    
+    def __repr__(self) -> str:
+        return f"Circle with center {self._c} and radius {self._r}"
 
 
-class Polygon(Element):
+class Polygon(Shape):
     def __init__(self, vertices: List[Point]) -> None:
         assert len(vertices) >= 3
         self._vertices = vertices
@@ -266,12 +380,42 @@ class Polygon(Element):
             Line(a, b) for a, b in zip(vertices, vertices[1:] + [vertices[0]])
         ]
         for e, e_n in zip(self._edges, self._edges[1:] + [self._edges[0]]):
-            if (e._b - e._a).cross(e_n._b - e_n._a) == 0:
+            if (e.b - e.a).cross(e_n.b - e_n.a) == 0:
                 raise ValueError(f"Edge {e} and {e_n} are parallel!")
-        self._envelop = (
-            Point(*np.minimum.reduce([p._pos for p in vertices])),
-            Point(*np.maximum.reduce([p._pos for p in vertices])),
+        super().__init__()
+        
+    def _get_envelope(self) -> Tuple[Point]:
+        return (
+            Point(*np.minimum.reduce([p.pos for p in self._vertices])),
+            Point(*np.maximum.reduce([p.pos for p in self._vertices])),
         )
+
+    @property
+    def vertices(self) -> List[Point]:
+        return self._vertices
+    
+    @property
+    def edges(self) -> List[Line]:
+        return self._edges
+    
+    def __add__(self, vector: Vector) -> "Polygon":
+        return Polygon([p + vector for p in self._vertices])
+    
+    def move(self, vector: Vector) -> None:
+        for p in self._vertices:
+            p += vector
+
+    def scale(self, new_envelope: Tuple[Point, Point]) -> None:
+        (min_x, min_y), (max_x, max_y) = new_envelope[0].pos, new_envelope[1].pos
+        (min_x_p, min_y_p), (max_x_p, max_y_p) = self._envelope[0].pos, self._envelope[1].pos
+        
+        scale_x = (max_x - min_x) / (max_x_p - min_x_p)
+        scale_y = (max_y - min_y) / (max_y_p - min_y_p)
+        
+        for p in self._vertices:
+            p.x = min_x + (p.x - min_x_p) * scale_x
+            p.y = min_y + (p.y - min_y_p) * scale_y
+        self._envelope = new_envelope
 
     def point_relative_pos(self, point: Point) -> Literal[-1, 0, 1]:
         """
@@ -280,7 +424,7 @@ class Polygon(Element):
         """
         in_flag = False
         for edge in self._edges:
-            a, b = edge._a, edge._b
+            a, b = edge.a, edge.b
             if edge.point_on(point):
                 return RelativePos.ON
 
@@ -298,6 +442,16 @@ class Polygon(Element):
                     in_flag = not in_flag
 
         return RelativePos.IN if in_flag else RelativePos.OUT
+    
+    def sample_point(self) -> Point:
+        min_x, min_y = self._envelope[0].pos
+        max_x, max_y = self._envelope[1].pos
+        while True:
+            x = np.random.uniform(min_x, max_x)
+            y = np.random.uniform(min_y, max_y)
+            point = Point(x, y)
+            if self.point_relative_pos(point) == RelativePos.IN:
+                return point
 
     def __repr__(self) -> str:
         points = [str(p) for p in self._vertices]
@@ -324,12 +478,17 @@ class Box(Polygon):
 
     def point_relative_pos(self, point: Point) -> RelativePos:
         if all((
-            (point._pos >= self._envelop[0]._pos).all(),
-            (point._pos <= self._envelop[1]._pos).all(),
+            (point.pos >= self._envelope[0].pos).all(),
+            (point.pos <= self._envelope[1].pos).all(),
         )):
             for edge in self._edges:
                 if edge.point_on(point):
                     return RelativePos.ON
             return RelativePos.IN
         return RelativePos.OUT
+    
+    def sample_point(self) -> Point:
+        min_x, min_y = self._envelope[0].pos
+        max_x, max_y = self._envelope[1].pos
+        return Point(np.random.uniform(min_x, max_x), np.random.uniform(min_y, max_y))
 

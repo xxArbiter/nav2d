@@ -1,8 +1,10 @@
 import numpy as np
+from typing import List, Tuple
 
-from nav2d.assets.elements import Point, Polygon, Box
+from nav2d.assets.elements import Point, Vector, Circle, Polygon, Box
 from nav2d.assets.regions import NoEntryRegion, BlackHoleRegion, SimpleRewardRegion
-from nav2d.envs.base import Navigation
+from nav2d.assets.generator.map import generate_map
+from nav2d.envs.base import Navigation, MultiNavigation
 
 
 class HomoNav(Navigation):
@@ -121,4 +123,47 @@ class WallNav(Navigation):
         )
 
         self.goal = np.array([9., 9.])
+
+
+class CellMapMultiNav(MultiNavigation):
+    def __init__(
+        self,
+        train_init_cells: List[Tuple[int, int]],
+        eval_init_cells: List[Tuple[int, int]],
+        goal_cells: List[Tuple[int, int]],
+        num_blocks: int,
+        num_dynamics: int,
+        v_max: float,
+        map_seed: int,
+    ):
+        init_cells = train_init_cells + eval_init_cells
+        self.cell_map = generate_map(
+            width=10,
+            height=10,
+            init_cells=init_cells,
+            goal_cells=goal_cells,
+            num_blocks=num_blocks,
+            num_dynamics=num_dynamics,
+            v_max=v_max,
+            seed=map_seed,
+        )
+        
+        self.train_init_zones = [Box(Point(*cell), 1, 1) for cell in train_init_cells]
+        self.eval_init_zones = [Box(Point(*cell), 1, 1) for cell in eval_init_cells]
+        goals = [Circle(Point(*cell) + Vector(.5, .5), 0.5) for cell in goal_cells]
+        
+        super().__init__(
+            init_zones=self.train_init_zones + self.eval_init_zones,
+            goals=goals,
+            dynamic_zones= self.cell_map._block_regions + self.cell_map._dynamic_regions,
+            reward_zones=[],
+            v_max=v_max,
+        )
+        
+    def reset(self, eval: bool = False):
+        if eval:
+            self.init_zones = self.eval_init_zones
+        else:
+            self.init_zones = self.train_init_zones
+        return super().reset()
 

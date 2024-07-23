@@ -5,8 +5,8 @@ import pygame
 from pygame.locals import Rect
 from typing import Dict, List
 
-from nav2d.assets.elements import Point, Vector, Line, DirectEdge, RelativePos, Polygon, Box
-from nav2d.assets.regions import Region, DynamicRegion, SimpleDynamicRegion, PunchRegion, NoEntryRegion, SlipperyRegion, BlackHoleRegion, RewardRegion, SimpleRewardRegion
+from nav2d.assets.elements import Point, Vector, Line, DirectEdge, RelativePos, Circle, Polygon, Box
+from nav2d.assets.regions import Region, DynamicRegion, SimpleDynamicRegion, PunchRegion, NoEntryRegion, Wall, SlipperyRegion, BlackHoleRegion, RewardRegion, SimpleRewardRegion
 
 from . import EPS_GOAL
 
@@ -22,10 +22,11 @@ class Navigation(gym.Env):
             reward_zones: List[RewardRegion] = [],
             draw_init: bool = True,
             dim: int = 2,
+            v_max: float = .5,
             **kwargs,
     ):
         #
-        self.v_max = 0.5
+        self.v_max = v_max
         self._draw_init = draw_init
         self._dim = dim
 
@@ -69,7 +70,23 @@ class Navigation(gym.Env):
         self.control_penalty = 0.4
         self.goal_dist_penalty = 0.5
 
-        # For rendering
+        self.pos_dim = 2
+        # self.obs_dim = self.observation_space.low.size
+        # self.action_dim = self.action_space.low.size
+
+        self._render_steup(screen_scale, margin)
+        self._boundary_setup()
+        self.np_random = None
+        
+    def _boundary_setup(self):
+        self.boundaries = [
+            Wall(Line(Point(-1, 0), Point(11, 0))),
+            Wall(Line(Point(10, -1), Point(10, 11))),
+            Wall(Line(Point(11, 10), Point(-1, 10))),
+            Wall(Line(Point(0, 11), Point(0, -1))),
+        ]
+
+    def _render_steup(self, screen_scale, margin):
         self.margin = int(screen_scale * margin)
         self.screen_size = [screen_scale + 2 * self.margin, screen_scale + 2 * self.margin]
         self.screen_scale = screen_scale
@@ -90,12 +107,6 @@ class Navigation(gym.Env):
         self.agent_radius = 9                       # The radius of the agent represented as a circle (in pixels)
         self.agent_width = 3                        # The width of the line of the circle representing the agent
         self.viewer = None
-
-        self.pos_dim = 2
-        self.obs_dim = self.observation_space.low.size
-        self.action_dim = self.action_space.low.size
-
-        self.np_random = None
 
     def seed(self, seed=None):
         self.np_random = np.random.default_rng(seed)
@@ -171,7 +182,8 @@ class Navigation(gym.Env):
             obs[self.pos_dim: self._dim] += action.copy()[self.pos_dim: self._dim] + \
                                             self.np_random.normal(0, 0.01, size=(self._dim-self.pos_dim, ))
         
-        obs = np.clip(obs, self.low_state, self.high_state)
+        # obs = np.clip(obs, self.low_state, self.high_state)
+        assert self.observation_space.contains(obs)
         self.set_state(obs.copy())
 
         d_goal = self.get_dist_to_goal()                # R(s', a)
@@ -209,6 +221,10 @@ class Navigation(gym.Env):
             _, self.dynamic_zones = zip(*sorted(zip(dist_to_contacts, self.dynamic_zones), key=lambda x: x[0]))
             for zone in self.dynamic_zones:
                 proposition = zone.apply_dynamic(p0, proposition)
+                
+        # Rejects the movement if it crosses the boundary.
+        for boundary in self.boundaries:
+            proposition = boundary.apply_dynamic(p0, proposition)
 
         # Applies rewards with an arbitrary order.
         add_rew = 0
@@ -247,6 +263,7 @@ class Navigation(gym.Env):
         if self.viewer is None:
             pygame.init()
             self.viewer = pygame.display.set_mode(self.screen_size)
+            print('Viewer initialized.')
             self.clock = pygame.time.Clock()
 
         for event in pygame.event.get():
@@ -268,8 +285,7 @@ class Navigation(gym.Env):
             pygame.draw.circle(self.viewer, self.init_color, init_pos, self.init_radius)
 
         # Draw the goal position
-        goal_pos = self.to_pixel(self.goal)
-        pygame.draw.circle(self.viewer, self.goal_color, goal_pos, self.goal_radius)
+        self.draw_goal()
 
         # Draw dynamic regions
         for region in self.dynamic_zones:
@@ -326,8 +342,82 @@ class Navigation(gym.Env):
 
     def set_state(self, state):
         self.state[:] = state
+        
+    def draw_goal(self):
+        goal_pos = self.to_pixel(self.goal)
+        pygame.draw.circle(self.viewer, self.goal_color, goal_pos, self.goal_radius)
 
     def get_goal_from_obs(self, obs):
         """obs = (x, y, ..., gx, gy)"""
         return obs[..., -2:]
 
+
+class MultiNavigation(Navigation):
+    def __init__(
+        self,
+        init_zones: List[Polygon],
+        goals: List[Circle],
+        dynamic_zones: List[DynamicRegion] = [],
+        reward_zones: List[RewardRegion] = [],
+        v_max: float = .1,
+        screen_scale: int = 600,
+        margin: float = 0.1,
+        **kwargs,
+    ):
+        self.init_zones = init_zones
+        self.goal_candidates = goals
+        self.num_goals = len(goals)
+        self.dynamic_zones = dynamic_zones
+        self.reward_zones = reward_zones
+        self.v_max = v_max
+        
+        # The map spans (0, 0) to (10, 10)
+        self.low_state = np.array([0, 0], dtype=np.float32)
+        self.high_state = np.array([10, 10], dtype=np.float32)
+        self.observation_space = spaces.Box(0, 10, shape=(2,), dtype=np.float32)
+        self.action_space = spaces.Box(-v_max, v_max, shape=(2,), dtype=np.float32)
+        
+        # Reward setup
+        self.time_penalty = 0.
+        self.control_penalty = 0.
+        self.goal_reward = 1.
+        
+        self.pos_dim = 2
+        self._draw_init = False
+        self._render_steup(screen_scale, margin)
+        self._boundary_setup()
+        
+    def reset(self):
+        idx = np.random.randint(0, len(self.init_zones))
+        init = self.init_zones[idx].sample_point()
+        self.state = np.array([init.x, init.y], dtype=np.float32)
+        idx = np.random.randint(0, self.num_goals)
+        self.goal = self.goal_candidates[idx]
+        
+        self.last_state = None
+        self.action = None
+        
+        return self.state.copy()
+    
+    def step(self, action: np.ndarray):
+        self.last_state = self.state.copy()
+        self.action = action.copy()
+        
+        new_state, add_rew = self.transition(self.state.copy(), action.copy())
+        assert self.observation_space.contains(new_state)
+        self.state = new_state.copy()
+        
+        action_cost = np.linalg.norm(action)
+        reward = (
+            - self.time_penalty
+            - self.control_penalty * action_cost
+            + add_rew
+        )
+        
+        done = self.goal.point_relative_pos(Point(*self.state)) == RelativePos.IN
+        
+        return self.state.copy(), reward, done, {}
+
+    def draw_goal(self):
+        goal_pos = self.to_pixel(self.goal.center.pos)
+        pygame.draw.circle(self.viewer, self.goal_color, goal_pos, self.goal_radius)

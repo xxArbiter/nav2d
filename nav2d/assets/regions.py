@@ -9,15 +9,19 @@ from .elements import Element, Point, Vector, Line, Polygon, RelativePos
 class Region(Element):
     def __init__(self, zone: Polygon) -> None:
         self._zone = zone
+        
+    @property
+    def zone(self):
+        return self._zone
 
     def check_segment_cross(
         self, p0: Point, proposition: Vector
     ) -> Tuple[List[Point], List[RelativePos]]:
         def __handle_corners(edge: Line, edge_next: Line):
-            if edge._b == p0:
+            if edge.b == p0:
                 return True
-            ba = edge._a - edge._b
-            bc = edge_next._b - edge_next._a
+            ba = edge.a - edge.b
+            bc = edge_next.b - edge_next.a
             if proposition.cross(ba) * proposition.cross(bc) > 0:
                 return False
             return True
@@ -30,17 +34,17 @@ class Region(Element):
             cross = pp.cross_point(edge)
             if cross is True:
                 overlap = pp.get_overlap(edge)
-                anchor_pts.extend([overlap._a, overlap._b])
+                anchor_pts.extend([overlap.a, overlap.b])
 
             elif isinstance(cross, Point):
                 # Vertex crosspoint will only be handled on the corner.
-                if cross == edge._b:
+                if cross == edge.b:
                     if any((
                         cross == p0,
                         __handle_corners(edge, edge_next),
                     )):
-                        anchor_pts.append(edge._b)
-                elif cross != edge._a:
+                        anchor_pts.append(edge.b)
+                elif cross != edge.a:
                     anchor_pts.append(cross)
 
         anchor_pts = list(set(anchor_pts))
@@ -55,8 +59,7 @@ class Region(Element):
 
     @property
     @abstractmethod
-    def should_apply(self):
-        ...
+    def should_apply(self): ...
 
     def first_contact(
         self, p0: Point, propositions: List[Vector]
@@ -94,8 +97,7 @@ class DynamicRegion(Region):
     COLOR = [160, 160, 160]
 
     @abstractmethod
-    def apply_dynamic(self, p0: Point, propositions: List[Vector]):
-        ...
+    def apply_dynamic(self, p0: Point, propositions: List[Vector]): ...
 
     @property
     def should_apply(self):
@@ -109,8 +111,7 @@ class SimpleDynamicRegion(DynamicRegion):
         return self._apply_dynamic(p0, proposition)
 
     @abstractmethod
-    def _apply_dynamic(self, p0: Point, proposition: Vector):
-        ...
+    def _apply_dynamic(self, p0: Point, proposition: Vector): ...
 
 
 class PunchRegion(SimpleDynamicRegion):
@@ -129,11 +130,11 @@ class PunchRegion(SimpleDynamicRegion):
         return proposition
 
     def __repr__(self) -> str:
-        return f"Punch zone with a fixed force '{self._force._pos}'. " + str(self._zone)
+        return f"Punch zone with a fixed force '{self._force.pos}'. " + str(self._zone)
 
 
 class NoEntryRegion(DynamicRegion):
-    """The agent CAN walk alongside the walls."""
+    """ The agent CAN walk alongside the walls. """
 
     COLOR = [0, 0, 0]
 
@@ -152,10 +153,36 @@ class NoEntryRegion(DynamicRegion):
 
     def __repr__(self) -> str:
         return "No entry zone. " + str(self._zone)
+    
+    
+class Wall(DynamicRegion):
+    """ The agent CAN walk alongside the walls. """
+
+    COLOR = [0, 0, 0]
+    
+    def __init__(self, zone: Line) -> None:
+        super().__init__(zone)
+        
+    def apply_dynamic(self, p0: Point, propositions: List[Vector]):
+        p = p0
+        movements = []
+        for prop in propositions:
+            line = Line(p, p + prop)
+            cross = line.cross_point(self._zone)
+            if isinstance(cross, Point):
+                movements.append(cross - p)
+                return movements
+            movements.append(prop)
+            p += prop
+        return movements
+    
+    def __repr__(self) -> str:
+        return "Wall. " + str(self._zone)
+            
 
 
 class SlipperyRegion(DynamicRegion):
-    def __init__(self, zone: Polygon, force: Vector) -> None:
+    def __init__(self, zone: Polygon, force: Vector, **kwargs) -> None:
         super().__init__(zone)
         self._force = force
 
@@ -185,7 +212,7 @@ class SlipperyRegion(DynamicRegion):
         return movements
 
     def __repr__(self) -> str:
-        return f"Slippery zone with a force rate '{self._force._pos}'. " + str(
+        return f"Slippery zone with a force rate '{self._force.pos}'. " + str(
             self._zone
         )
 
