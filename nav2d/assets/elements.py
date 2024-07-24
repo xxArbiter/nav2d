@@ -4,7 +4,7 @@ from enum import Enum
 import numpy as np
 
 
-DEFAULT_DTYPE = np.float32
+DEFAULT_DTYPE = np.float64
 
 
 class Element(ABC):
@@ -62,7 +62,8 @@ class Point(Element):
         return Vector(*(self._pos - other._pos))
 
     def __eq__(self, other: "Point") -> bool:
-        return np.array_equal(self._pos, other._pos)
+        # return np.array_equal(self._pos, other._pos)
+        return np.allclose(self._pos, other._pos, atol=1e-6)
 
     def __hash__(self):
         return hash((self._x, self._y))
@@ -97,7 +98,7 @@ class Vector(Point):
     def __mul__(self, other: Union[float, "Vector"]) -> "Vector":
         if isinstance(other, Vector):
             return Vector(*(self._pos * other._pos))
-        elif isinstance(other, (int, float, np.float32)):
+        elif isinstance(other, (int, float, np.float64)):
             return Vector(*(self._pos * other))
         else:
             raise TypeError(f"Unsupported type {type(other)} for __mul__")
@@ -106,7 +107,7 @@ class Vector(Point):
         return self * other
 
     def __truediv__(self, a: float) -> "Vector":
-        assert isinstance(a, (float, int, np.float32))
+        assert isinstance(a, (float, int, np.float64))
         return Vector(*(self._pos / a))
 
     def dot(self, other: "Vector") -> float:

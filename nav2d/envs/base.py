@@ -31,26 +31,26 @@ class Navigation(gym.Env):
         self._dim = dim
 
         # The map spans (0, 0) to (10, 10)
-        self.low_state = np.array([0, 0] + [0] * (self._dim - 2) + [0, 0], dtype=np.float32)
-        self.high_state = np.array([10, 10] + [5] * (self._dim - 2) + [10, 10], dtype=np.float32)
+        self.low_state = np.array([0, 0] + [0] * (self._dim - 2) + [0, 0], dtype=np.float64)
+        self.high_state = np.array([10, 10] + [5] * (self._dim - 2) + [10, 10], dtype=np.float64)
         self.observation_space = spaces.Box(
             low=self.low_state,
             high=self.high_state,
             shape=(self._dim+2, ),
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         # The largest step size of the agent in one timestep is capped at v_max
         self.min_actions = np.array(
-            [-self.v_max] * self._dim, dtype=np.float32,
+            [-self.v_max] * self._dim, dtype=np.float64,
         )
         self.max_actions = np.array(
-            [self.v_max] * self._dim, dtype=np.float32,
+            [self.v_max] * self._dim, dtype=np.float64,
         )
         self.action_space = spaces.Box(
             low=self.min_actions,
             high=self.max_actions,
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         self.goal = np.array([9.0, 9.0])
@@ -137,7 +137,7 @@ class Navigation(gym.Env):
         while not sampled:
             # Normal initial state distribution
             self.init_pos = np.array([self.np_random.normal(self.init_dist[0][0], self.init_dist[0][1]),
-                                      self.np_random.normal(self.init_dist[1][0], self.init_dist[1][1])], dtype=np.float32)
+                                      self.np_random.normal(self.init_dist[1][0], self.init_dist[1][1])], dtype=np.float64)
             if not self.__need_resample(self.init_pos):
                 sampled = True
             # self.init_pos = np.clip(self.init_pos, self.low_state, self.high_state)
@@ -382,10 +382,10 @@ class MultiNavigation(Navigation):
         self.v_max = v_max
         
         # The map spans (0, 0) to (10, 10)
-        self.low_state = np.array([0, 0], dtype=np.float32)
-        self.high_state = np.array([10, 10], dtype=np.float32)
-        self.observation_space = spaces.Box(0, 10, shape=(2,), dtype=np.float32)
-        self.action_space = spaces.Box(-v_max, v_max, shape=(2,), dtype=np.float32)
+        self.low_state = np.array([0, 0], dtype=np.float64)
+        self.high_state = np.array([10, 10], dtype=np.float64)
+        self.observation_space = spaces.Box(0, 10, shape=(2,), dtype=np.float64)
+        self.action_space = spaces.Box(-v_max, v_max, shape=(2,), dtype=np.float64)
         
         # Reward setup
         if sparse:
@@ -404,7 +404,7 @@ class MultiNavigation(Navigation):
             self.seed(0)
         idx = self.np_random.integers(0, len(self.init_zones))
         init = self.init_zones[idx].sample_point()
-        self.state = np.array([init.x, init.y], dtype=np.float32)
+        self.state = np.array([init.x, init.y], dtype=np.float64)
         idx = self.np_random.integers(0, self.num_goals)
         self.goal = self.goal_candidates[idx]
         
@@ -442,4 +442,4 @@ class MultiNavigation(Navigation):
 
     @property
     def goal_pos(self):
-        return self.goal.center.pos.astype(np.float32)
+        return self.goal.center.pos.astype(np.float64)
