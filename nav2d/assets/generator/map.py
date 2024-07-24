@@ -8,14 +8,15 @@ from ..map import CellMap
 from .polygon import generate_polygon
 
 
-def select(grid_map):
+def select(grid_map: np.ndarray, rng: np.random.Generator):
     zero_idxes = np.argwhere(grid_map == 0)
     if zero_idxes.size == 0:
         raise ValueError("No zero index found")
-    
-    i, j = zero_idxes[np.random.choice(zero_idxes.shape[0])]
+
+    i, j = zero_idxes[rng.choice(zero_idxes.shape[0])]
     grid_map[i, j] = 1
     return [i, j]
+
 
 def generate_map(
     width: int,
@@ -45,38 +46,40 @@ def generate_map(
         CellMap: the returned VALID map
     """
     random.seed(seed)
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
 
     while True:
         grid_map = np.zeros((width, height))
-        for cell in init_cells + goal_cells:
-            grid_map[cell[0], cell[1]] = 1
         
         block = []
         dynamics = []
-        for _ in range(num_blocks):
-            x, y = select(grid_map)
-            polygon = generate_polygon(Point(x, y), 1, .3, .3, 6)
-            polygon.scale([Point(x, y), Point(x + 1, y + 1)])
-            region = NoEntryRegion(polygon)
-            block.append(region)
         for _ in range(num_dynamics):
-            x, y = select(grid_map)
+            x, y = select(grid_map, rng)
             polygon = generate_polygon(Point(x, y), 1, .3, .3, 6)
             polygon.scale([Point(x, y), Point(x + 1, y + 1)])
             region_cls = random.choice([SlipperyRegion, BlackHoleRegion])
-            force = Vector(*np.random.uniform(-1, 1, 2))
+            force = Vector(*rng.uniform(-1, 1, 2))
             force *= 0.6 * v_max / force.length
             force = force.length if region_cls.__name__ == "BlackHoleRegion" else force
             center = Point(x + 0.5, y + 0.5)
             dynamics.append(region_cls(zone=polygon, center=center, force=force))
+
+        for cell in init_cells + goal_cells:
+            grid_map[cell[0], cell[1]] = 1
+
+        for _ in range(num_blocks):
+            x, y = select(grid_map, rng)
+            polygon = generate_polygon(Point(x, y), 1, .3, .3, 6)
+            polygon.scale([Point(x, y), Point(x + 1, y + 1)])
+            region = NoEntryRegion(polygon)
+            block.append(region)
     
         map = CellMap.make_map(width, height, init_cells, goal_cells, block, dynamics)
         if map is not None:
             print(map)
             # Reset to random seeds
-            random.seed()
-            np.random.seed(None)
+            # random.seed()
+            # np.random.seed(None)
             return map
         else:
             print("Invalid map, retrying...")

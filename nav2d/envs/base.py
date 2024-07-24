@@ -293,12 +293,12 @@ class Navigation(gym.Env):
             init_pos = self.to_pixel(self.init_center)
             pygame.draw.circle(self.viewer, self.init_color, init_pos, self.init_radius)
 
-        # Draw the goal position
-        self.draw_goal()
-
         # Draw dynamic regions
         for region in self.dynamic_zones:
             region.render(self.viewer, self.to_pixel)
+
+        # Draw the goal position
+        self.draw_goal()
 
         # Draw reward regions
         for region in self.reward_zones:
