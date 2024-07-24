@@ -97,7 +97,7 @@ class Vector(Point):
     def __mul__(self, other: Union[float, "Vector"]) -> "Vector":
         if isinstance(other, Vector):
             return Vector(*(self._pos * other._pos))
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, (int, float, np.float32)):
             return Vector(*(self._pos * other))
         else:
             raise TypeError(f"Unsupported type {type(other)} for __mul__")
@@ -106,7 +106,7 @@ class Vector(Point):
         return self * other
 
     def __truediv__(self, a: float) -> "Vector":
-        assert isinstance(a, (float, int))
+        assert isinstance(a, (float, int, np.float32))
         return Vector(*(self._pos / a))
 
     def dot(self, other: "Vector") -> float:
