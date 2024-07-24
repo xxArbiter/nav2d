@@ -4,6 +4,9 @@ from enum import Enum
 import numpy as np
 
 
+DEFAULT_DTYPE = np.float32
+
+
 class Element(ABC):
     def __init__(self) -> None:
         super().__init__()
@@ -17,7 +20,7 @@ class Point(Element):
     def __init__(self, x: float, y: float) -> None:
         self._x = x
         self._y = y
-        self._pos = np.array([x, y])
+        self._pos = np.array([x, y], dtype=DEFAULT_DTYPE)
         
     @property
     def x(self) -> float:

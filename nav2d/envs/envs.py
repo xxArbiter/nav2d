@@ -137,6 +137,7 @@ class CellMapMultiNav(MultiNavigation):
         map_seed: int,
         seed: int,
         sparse: bool = True,
+        eval: bool = False,
     ):
         init_cells = train_init_cells + eval_init_cells
         self.cell_map = generate_map(
@@ -162,9 +163,10 @@ class CellMapMultiNav(MultiNavigation):
             v_max=v_max,
             sparse=sparse,
         )
+        self.eval = eval
         
     def reset(self, eval: bool = False):
-        if eval:
+        if eval or self.eval:
             self.init_zones = self.eval_init_zones
         else:
             self.init_zones = self.train_init_zones

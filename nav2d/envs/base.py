@@ -80,10 +80,14 @@ class Navigation(gym.Env):
         
     def _boundary_setup(self):
         self.boundaries = [
-            Wall(Line(Point(-1, 0), Point(11, 0))),
-            Wall(Line(Point(10, -1), Point(10, 11))),
-            Wall(Line(Point(11, 10), Point(-1, 10))),
-            Wall(Line(Point(0, 11), Point(0, -1))),
+            # Wall(Line(Point(-1, 0), Point(11, 0))),
+            # Wall(Line(Point(10, -1), Point(10, 11))),
+            # Wall(Line(Point(11, 10), Point(-1, 10))),
+            # Wall(Line(Point(0, 11), Point(0, -1))),
+            NoEntryRegion(Box(Point(-self.v_max, -self.v_max), 10 + 2 * self.v_max, self.v_max)),
+            NoEntryRegion(Box(Point(-self.v_max, -self.v_max), self.v_max, 10 + 2 * self.v_max)),
+            NoEntryRegion(Box(Point(10, -self.v_max), self.v_max, 10 + 2 * self.v_max)),
+            NoEntryRegion(Box(Point(-self.v_max, 10), 10 + 2 * self.v_max, self.v_max)),
         ]
 
     def _render_steup(self, screen_scale, margin):
@@ -231,7 +235,12 @@ class Navigation(gym.Env):
         for zone in self.reward_zones:
             add_rew += zone.apply_reward(p0, proposition)
 
-        return (p0 + sum(proposition)).pos, add_rew
+        # Handle numerical precision issue.
+        def clamp_near_zero(array, tolerance=1e-6):
+            return np.where(np.abs(array) < tolerance, 0, array)
+        next_pos = (p0 + sum(proposition)).pos
+        next_pos = clamp_near_zero(next_pos)
+        return next_pos, add_rew
 
     @property
     def agent_pos(self):
@@ -426,3 +435,11 @@ class MultiNavigation(Navigation):
     def draw_goal(self):
         goal_pos = self.to_pixel(self.goal.center.pos)
         pygame.draw.circle(self.viewer, self.goal_color, goal_pos, self.goal_radius)
+
+    @property
+    def agent_pos(self):
+        return self.state[:self.pos_dim]
+
+    @property
+    def goal_pos(self):
+        return self.goal.center.pos.astype(np.float32)
