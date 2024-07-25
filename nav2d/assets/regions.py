@@ -44,8 +44,8 @@ class Region(Element):
                         __handle_corners(edge, edge_next),
                     )):
                         anchor_pts.append(edge.b)
-                elif cross == p0:
-                    continue
+                # elif cross == p0:
+                #     continue
                 elif cross != edge.a:
                     anchor_pts.append(cross)
 

@@ -429,6 +429,8 @@ class MultiNavigation(Navigation):
         )
         
         done = self.goal.point_relative_pos(Point(*self.state)) == RelativePos.IN
+        if done:
+            reward += self.goal_reward
         
         return self.state.copy(), reward, done, {}
 

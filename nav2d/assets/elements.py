@@ -49,10 +49,12 @@ class Point(Element):
         self._pos = pos
         self._x, self._y = pos
 
-    def __add__(self, vector: "Vector") -> "Point":
-        if not isinstance(vector, Vector):
-            raise TypeError("Can only add a vector to a point.")
-        return Point(*(self._pos + vector._pos))
+    # Handle this case in Vector.__radd__ because Python MRO treats Vector as a
+    # subclass of Point and resolve Point + Vector with Vector.__radd__.
+    # def __add__(self, vector: "Vector") -> "Point":
+    #     if not isinstance(vector, Vector):
+    #         raise TypeError("Can only add a vector to a point.")
+    #     return Point(*(self._pos + vector._pos))
 
     def __sub__(self, other: "Point") -> "Vector":
         if not isinstance(other, Point):
@@ -84,9 +86,11 @@ class Vector(Point):
     def __add__(self, other: "Vector") -> "Vector":
         return Vector(*(self._pos + other._pos))
 
-    def __radd__(self, other) -> "Vector":
+    def __radd__(self, other) -> Union["Vector", "Point"]:
         if isinstance(other, int) and other == 0:
             return self
+        if isinstance(other, Point):
+            return Point(*(other._pos + self._pos))
         return self.__add__(other)
 
     def __sub__(self, other: "Vector") -> "Vector":
@@ -98,7 +102,7 @@ class Vector(Point):
     def __mul__(self, other: Union[float, "Vector"]) -> "Vector":
         if isinstance(other, Vector):
             return Vector(*(self._pos * other._pos))
-        elif isinstance(other, (int, float, np.float64)):
+        elif isinstance(other, (int, float, DEFAULT_DTYPE)):
             return Vector(*(self._pos * other))
         else:
             raise TypeError(f"Unsupported type {type(other)} for __mul__")
@@ -107,7 +111,7 @@ class Vector(Point):
         return self * other
 
     def __truediv__(self, a: float) -> "Vector":
-        assert isinstance(a, (float, int, np.float64))
+        assert isinstance(a, (float, int, DEFAULT_DTYPE))
         return Vector(*(self._pos / a))
 
     def dot(self, other: "Vector") -> float:

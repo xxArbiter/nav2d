@@ -60,7 +60,7 @@ def generate_map(
             region_cls = random.choice([SlipperyRegion, BlackHoleRegion])
             force = Vector(*rng.uniform(-1, 1, 2))
             force *= 0.6 * v_max / force.length
-            force = force.length if region_cls.__name__ == "BlackHoleRegion" else force
+            force = force.length if region_cls == BlackHoleRegion else force
             center = Point(x + 0.5, y + 0.5)
             dynamics.append(region_cls(zone=polygon, center=center, force=force))
 
