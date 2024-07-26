@@ -225,6 +225,11 @@ class Navigation(gym.Env):
             _, self.dynamic_zones = zip(*sorted(zip(dist_to_contacts, self.dynamic_zones), key=lambda x: x[0]))
             for zone in self.dynamic_zones:
                 proposition = zone.apply_dynamic(p0, proposition)
+            # Applies NoEntry dynamics again to ensure the movement after applying
+            # other dynamics is still valid.
+            for zone in self.dynamic_zones:
+                if isinstance(zone, NoEntryRegion):
+                    proposition = zone.apply_dynamic(p0, proposition)
                 
         # Rejects the movement if it crosses the boundary.
         for boundary in self.boundaries:

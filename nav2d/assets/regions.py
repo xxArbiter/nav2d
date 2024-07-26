@@ -44,8 +44,8 @@ class Region(Element):
                         __handle_corners(edge, edge_next),
                     )):
                         anchor_pts.append(edge.b)
-                # elif cross == p0:
-                #     continue
+                elif cross == p0:
+                    continue
                 elif cross != edge.a:
                     anchor_pts.append(cross)
 
@@ -184,6 +184,9 @@ class Wall(DynamicRegion):
 
 
 class SlipperyRegion(DynamicRegion):
+    
+    COLOR = [0xFF, 0xFF, 0x9F]
+    
     def __init__(self, zone: Polygon, force: Vector, **kwargs) -> None:
         super().__init__(zone)
         self._force = force
