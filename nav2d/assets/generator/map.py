@@ -27,6 +27,7 @@ def generate_map(
     num_dynamics: int,
     v_max: float,
     seed: int,
+    bounce: str | None = None,
 ) -> CellMap:
     """
     Generate a cell map given parameters
@@ -41,6 +42,7 @@ def generate_map(
         v_max (float): maximum allowed movement in the map
             * The forces in dynamic regions will be scaled by this value
         seed (int): RNG seed
+        bounce (str | None): refer to NoEntryRegion. None,  'reflection' or 'back'.
 
     Returns:
         CellMap: the returned VALID map
@@ -71,7 +73,7 @@ def generate_map(
             x, y = select(grid_map, rng)
             polygon = generate_polygon(Point(x, y), 1, .3, .3, 6)
             polygon.scale([Point(x, y), Point(x + 1, y + 1)])
-            region = NoEntryRegion(polygon)
+            region = NoEntryRegion(polygon, bounce=bounce)
             block.append(region)
     
         map = CellMap.make_map(width, height, init_cells, goal_cells, block, dynamics)

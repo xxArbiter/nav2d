@@ -17,6 +17,8 @@ class Element(ABC):
 
 
 class Point(Element):
+    SCALE_FACTOR = 1e-6
+    
     def __init__(self, x: float, y: float) -> None:
         self._x = x
         self._y = y
@@ -65,13 +67,16 @@ class Point(Element):
 
     def __eq__(self, other: "Point") -> bool:
         # return np.array_equal(self._pos, other._pos)
-        return np.allclose(self._pos, other._pos, atol=1e-6)
+        return np.allclose(self._pos, other._pos, atol=Point.SCALE_FACTOR)
 
     def __hash__(self):
-        return hash((self._x, self._y))
+        # return hash((self._x, self._y))
+        # This critiria is supposed to be "looser" than __eq__, because they cannot
+        # produce identical equality, but we want the set() to work properly.
+        return hash((np.floor(self._x / Point.SCALE_FACTOR / 10), np.floor(self._y / Point.SCALE_FACTOR / 10)))
 
     def __repr__(self) -> str:
-        return "Point({x:.2f}, {y:.2f})".format(x=self._x, y=self._y)
+        return "Point({x:.10f}, {y:.10f})".format(x=self._x, y=self._y)
 
 
 class Vector(Point):
@@ -276,6 +281,9 @@ class Line(Element):
         ):
             return True
         return False
+    
+    def __hash__(self) -> int:
+        return hash((self._a, self._b))
 
     def __repr__(self) -> str:
         return "Line ({x1:.2f}, {y1:.2f}), ({x2:.2f}, {y2:.2f})".format(

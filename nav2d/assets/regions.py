@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Dict, Callable, Union
+from collections import defaultdict
 import numpy as np
 import pygame
 
@@ -16,48 +17,89 @@ class Region(Element):
 
     def check_segment_cross(
         self, p0: Point, proposition: Vector
-    ) -> Tuple[List[Point], List[RelativePos]]:
-        def __handle_corners(edge: Line, edge_next: Line):
-            if edge.b == p0:
-                return True
-            ba = edge.a - edge.b
-            bc = edge_next.b - edge_next.a
-            if proposition.cross(ba) * proposition.cross(bc) > 0:
-                return False
-            return True
-
-        anchor_pts: List[Point] = [p0, p0 + proposition]
+    ) -> Tuple[List[Point], List[List[Line]], List[RelativePos]]:
+        # def __handle_corners(edge: Line, edge_next: Line):
+        #     """
+        #     Determine if we should consider the corner as an anchor point.
+            
+        #     Return False if the proposition vector cross the corner from the
+        #     outside of the polygon.
+        #     """
+        #     if edge.b == p0:
+        #         return True
+        #     ba = edge.a - edge.b
+        #     bc = edge_next.b - edge_next.a
+        #     if proposition.cross(ba) * proposition.cross(bc) > 0:
+        #         return False
+        #     return True
+        
+        anchor_edges: Dict[Point, List[Line]] = defaultdict(list)
         pp = Line(p0, p0 + proposition)
-        for edge, edge_next in zip(
-            self._zone._edges, self._zone._edges[1:] + [self._zone._edges[0]]
-        ):
+        for edge in self._zone._edges:
             cross = pp.cross_point(edge)
             if cross is True:
                 overlap = pp.get_overlap(edge)
-                anchor_pts.extend([overlap.a, overlap.b])
-
+                anchor_edges[overlap.a].append(edge)
+                anchor_edges[overlap.b].append(edge)
             elif isinstance(cross, Point):
-                # Vertex crosspoint will only be handled on the corner.
-                if cross == edge.b:
-                    if any((
-                        cross == p0,
-                        __handle_corners(edge, edge_next),
-                    )):
-                        anchor_pts.append(edge.b)
-                elif cross == p0:
-                    continue
-                elif cross != edge.a:
-                    anchor_pts.append(cross)
-
+                anchor_edges[cross].append(edge)
+                
+        anchor_pts = list(anchor_edges.keys()) + [p0, p0 + proposition]
         anchor_pts = list(set(anchor_pts))
         lengths = [(cross - p0).length for cross in anchor_pts]
         _, anchor_pts = zip(*sorted(zip(lengths, anchor_pts), key=lambda x: x[0]))
+        
+        cross_edges = [set(anchor_edges[anchor]) for anchor in anchor_pts]
+        assert all([len(edges) <= 2 for edges in cross_edges]), \
+            f"An anchor point can only cross at most 2 edges. {cross_edges}, \n {anchor_edges}"
+        assert all([len(edges) > 0 for edges in cross_edges[1:-1]]), (
+            "An anchor point other than the two ends should cross at least one edge.\n" +
+            f"p0: {p0}, proposition: {proposition}\n" +
+            f"polygon: {self._zone},\n" +
+            f"anchor_pts: {anchor_pts},\n" +
+            f"cross_edges: {cross_edges}"
+        )
+        
         seg2poly_relation = []
         for p1, p2 in zip(anchor_pts[:-1], anchor_pts[1:]):
             mid = p1 + (p2 - p1) / 2
             seg2poly_relation.append(self._zone.point_relative_pos(mid))
 
-        return anchor_pts, seg2poly_relation
+        return anchor_pts, cross_edges, seg2poly_relation
+
+        # anchor_pts: List[Point] = [p0, p0 + proposition]
+        # pp = Line(p0, p0 + proposition)
+        # for edge, edge_next in zip(
+        #     self._zone._edges, self._zone._edges[1:] + [self._zone._edges[0]]
+        # ):
+        #     cross = pp.cross_point(edge)
+        #     if cross is True:
+        #         overlap = pp.get_overlap(edge)
+        #         anchor_pts.extend([overlap.a, overlap.b])
+
+        #     elif isinstance(cross, Point):
+        #         # Vertex crosspoint will only be handled on the corner.
+        #         if cross == edge.b:
+        #             if any((
+        #                 cross == p0,
+        #                 __handle_corners(edge, edge_next),
+        #             )):
+        #                 anchor_pts.append(edge.b)
+        #         elif cross == p0:
+        #             continue
+        #         elif cross != edge.a:
+        #             anchor_pts.append(cross)
+                
+
+        # anchor_pts = list(set(anchor_pts))
+        # lengths = [(cross - p0).length for cross in anchor_pts]
+        # _, anchor_pts = zip(*sorted(zip(lengths, anchor_pts), key=lambda x: x[0]))
+        # seg2poly_relation = []
+        # for p1, p2 in zip(anchor_pts[:-1], anchor_pts[1:]):
+        #     mid = p1 + (p2 - p1) / 2
+        #     seg2poly_relation.append(self._zone.point_relative_pos(mid))
+
+        # return anchor_pts, seg2poly_relation
 
     @property
     @abstractmethod
@@ -75,7 +117,7 @@ class Region(Element):
         p = p0
         cuml_dist = 0
         for prop in propositions:
-            anchor_pts, rel_poss = self.check_segment_cross(p, prop)
+            anchor_pts, _, rel_poss = self.check_segment_cross(p, prop)
             for anchor1, anchor2, rel_pos in zip(
                 anchor_pts[:-1], anchor_pts[1:], rel_poss
             ):
@@ -126,7 +168,7 @@ class PunchRegion(SimpleDynamicRegion):
         self._force = force
 
     def _apply_dynamic(self, p0: Point, proposition: Vector):
-        _, rel_poss = self.check_segment_cross(p0, proposition)
+        _, _, rel_poss = self.check_segment_cross(p0, proposition)
         if RelativePos.IN in rel_poss:
             return proposition + self._force
         return proposition
@@ -139,17 +181,80 @@ class NoEntryRegion(DynamicRegion):
     """ The agent CAN walk alongside the walls. """
 
     COLOR = [0, 0, 0]
+    BOUNCE_BACK_DIST = 1e-3
+    BOUNCE_REFLECTION_FACTOR = 0.5
+    
+    def __init__(self, zone: Polygon, bounce: Union[None, str] = None) -> None:
+        if bounce is None:
+            self._bounce = self._bounce_reject
+        elif bounce == "reflection":
+            self._bounce = self._bounce_reflection
+        elif bounce == "back":
+            self._bounce = self._bounce_back
+        else:
+            raise ValueError(f"Unknown bounce type: {bounce}")
+        super().__init__(zone)
+    
+    def _bounce_reflection(
+        self,
+        movements: List[Vector],
+        intention: Vector,
+        edges: List[Line],
+        bounce_dist: float
+    ):
+        assert len(edges) > 0, "No edge to bounce (reflection)."
+        bounce_dist *= NoEntryRegion.BOUNCE_REFLECTION_FACTOR
+        
+        if len(edges) == 1:
+            edge_vec = edges[0].a - edges[0].b
+            normal = Vector(edge_vec.y, -edge_vec.x)
+        if len(edges) == 2:
+            # We need to find the "normal" (angle bisector) vector of the corner.
+            assert edges[0].a == edges[1].b or edges[0].b == edges[1].a
+            normal = (edges[0].a - edges[0].b) + (edges[1].b - edges[1].a)
+
+        normal /= normal.length
+        reflection = intention - 2 * intention.dot(normal) * normal
+        reflection = reflection / reflection.length * bounce_dist
+        movements.append(reflection)
+        
+        return movements
+    
+    def _bounce_back(self, movements: List[Vector], **kwargs):
+        to_bounce = NoEntryRegion.BOUNCE_BACK_DIST
+        
+        while len(movements) > 0:
+            if movements[-1].length < to_bounce:
+                to_bounce -= movements[-1].length
+                movements.pop()
+            else:
+                movements[-1] -= movements[-1] / movements[-1].length * to_bounce
+                return movements
+            
+        return movements
+    
+    def _bounce_reject(self, movements: List[Vector], **kwargs):
+        return movements
 
     def apply_dynamic(self, p0: Point, propositions: List[Vector]):
         p = p0
         movements = []
+        total_length = sum([prop.length for prop in propositions])
+        cmlt_length = 0
         for prop in propositions:
-            anchor_pts, rel_poss = self.check_segment_cross(p, prop)
-            for anchor, rel_pos in zip(anchor_pts[:-1], rel_poss):
+            anchor_pts, cross_edges, rel_poss = self.check_segment_cross(p, prop)
+            for anchor, edges, rel_pos in zip(anchor_pts[:-1], cross_edges[:-1], rel_poss):
                 if rel_pos in self.should_apply:
                     movements.append(anchor - p)
-                    return movements
+                    cmlt_length += (anchor - p).length
+                    return self._bounce(
+                        movements=movements,
+                        intention=prop,
+                        edges=edges,
+                        bounce_dist=total_length - cmlt_length,
+                    )
             movements.append(prop)
+            cmlt_length += prop.length
             p += prop
         return movements
 
@@ -197,7 +302,7 @@ class SlipperyRegion(DynamicRegion):
         total_length = sum([prop.length for prop in propositions])
         for prop in propositions:
             normal_length = 0
-            anchor_pts, rel_poss = self.check_segment_cross(p, prop)
+            anchor_pts, _, rel_poss = self.check_segment_cross(p, prop)
             movement = None
             for anchor1, anchor2, rel_pos in zip(
                 anchor_pts[:-1], anchor_pts[1:], rel_poss
@@ -234,7 +339,7 @@ class BlackHoleRegion(DynamicRegion):
         total_length = sum([prop.length for prop in propositions])
         for prop in propositions:
             normal_length = 0
-            anchor_pts, rel_poss = self.check_segment_cross(p, prop)
+            anchor_pts, _, rel_poss = self.check_segment_cross(p, prop)
             movement = None
             for anchor1, anchor2, rel_pos in zip(
                 anchor_pts[:-1], anchor_pts[1:], rel_poss
@@ -284,7 +389,7 @@ class RewardRegion(Region):
         counted_length = 0
         for prop in propositions:
             total_length += prop.length
-            anchor_pts, rel_poss = self.check_segment_cross(p, prop)
+            anchor_pts, _, rel_poss = self.check_segment_cross(p, prop)
             for anchor1, anchor2, rel_pos in zip(
                 anchor_pts[:-1], anchor_pts[1:], rel_poss
             ):

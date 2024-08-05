@@ -136,6 +136,7 @@ class CellMapMultiNav(MultiNavigation):
         v_max: float,
         map_seed: int,
         seed: int,
+        bounce: str | None = None,
         sparse: bool = True,
         eval: bool = False,
     ):
@@ -149,6 +150,7 @@ class CellMapMultiNav(MultiNavigation):
             num_dynamics=num_dynamics,
             v_max=v_max,
             seed=map_seed,
+            bounce=bounce,
         )
         
         self.train_init_zones = [Box(Point(*cell), 1, 1, seed=seed+i) for i, cell in enumerate(train_init_cells)]

@@ -227,9 +227,12 @@ class Navigation(gym.Env):
                 proposition = zone.apply_dynamic(p0, proposition)
             # Applies NoEntry dynamics again to ensure the movement after applying
             # other dynamics is still valid.
-            for zone in self.dynamic_zones:
-                if isinstance(zone, NoEntryRegion):
-                    proposition = zone.apply_dynamic(p0, proposition)
+            last_proposition = None
+            while proposition != last_proposition:
+                last_proposition = proposition.copy()
+                for zone in self.dynamic_zones:
+                    if isinstance(zone, NoEntryRegion):
+                        proposition = zone.apply_dynamic(p0, proposition)
                 
         # Rejects the movement if it crosses the boundary.
         for boundary in self.boundaries:
