@@ -17,7 +17,7 @@ class Element(ABC):
 
 
 class Point(Element):
-    SCALE_FACTOR = 1e-6
+    PRECISION = 6
     
     def __init__(self, x: float, y: float) -> None:
         self._x = x
@@ -67,13 +67,16 @@ class Point(Element):
 
     def __eq__(self, other: "Point") -> bool:
         # return np.array_equal(self._pos, other._pos)
-        return np.allclose(self._pos, other._pos, atol=Point.SCALE_FACTOR)
+        return (
+            round(self._x, Point.PRECISION) == round(other._x, Point.PRECISION) and
+            round(self._y, Point.PRECISION) == round(other._y, Point.PRECISION)
+        )
 
     def __hash__(self):
         # return hash((self._x, self._y))
         # This critiria is supposed to be "looser" than __eq__, because they cannot
         # produce identical equality, but we want the set() to work properly.
-        return hash((np.floor(self._x / Point.SCALE_FACTOR / 10), np.floor(self._y / Point.SCALE_FACTOR / 10)))
+        return hash((round(self._x, Point.PRECISION), round(self._y, Point.PRECISION)))
 
     def __repr__(self) -> str:
         return "Point({x:.10f}, {y:.10f})".format(x=self._x, y=self._y)

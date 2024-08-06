@@ -49,7 +49,7 @@ class Region(Element):
         lengths = [(cross - p0).length for cross in anchor_pts]
         _, anchor_pts = zip(*sorted(zip(lengths, anchor_pts), key=lambda x: x[0]))
         
-        cross_edges = [set(anchor_edges[anchor]) for anchor in anchor_pts]
+        cross_edges = [list(dict.fromkeys(anchor_edges[anchor])) for anchor in anchor_pts]
         assert all([len(edges) <= 2 for edges in cross_edges]), \
             f"An anchor point can only cross at most 2 edges. {cross_edges}, \n {anchor_edges}"
         assert all([len(edges) > 0 for edges in cross_edges[1:-1]]), (
